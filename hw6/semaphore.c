@@ -14,13 +14,13 @@ int queue_size(const struct queue *q) {
   return q->r - q->l;
 }
   
-int queue_pop(const struct queue *q) {
+int queue_pop(struct queue *q) {
   int ans = q->data[q->l];
   (q->l)++;
   return ans;
 }
   
-void queue_push(const struct queue *q, int val) {
+void queue_push(struct queue *q, int val) {
   q->data[q->r] = val;
   (q->r)++;
 }
@@ -43,7 +43,7 @@ int main() {
     } info;
   } data, answer;
   
-  struct mymsgbuf * mymsgbuf_init(const struct mymsgbuf *buf, long mtype, char operation, int pid) {   
+  struct mymsgbuf * mymsgbuf_init(struct mymsgbuf *buf, long mtype, char operation, int pid) {   
     buf->mtype = mtype;
     buf->info.operation = operation;
     buf->info.pid = pid;
@@ -64,7 +64,7 @@ int main() {
   void send_message(struct mymsgbuf *msg) {
     int len = sizeof(msg);
     if (msgsnd(msqid, (struct msgbuf *) msg, len, 0) < 0) {
-      printf("Can\'t send message to queue\n");
+      printf("Can\'t send message to queue1\n");
       msgctl(msqid, IPC_RMID, (struct msqid_ds *) NULL);
       exit(-1);
     }  
@@ -83,7 +83,7 @@ int main() {
       //proberen
       send_message(mymsgbuf_init(&data, 1, 'p', cur_pid));
       if (len = msgrcv(msqid, (struct msgbuf *) &data, maxlen, cur_pid, 0) < 0) {
-	  printf("Can\'t receive message from queue\n");
+	  printf("Can\'t receive message from queue2\n");
 	  exit(-1);
       }   
       //verhogen
@@ -96,7 +96,7 @@ int main() {
   //start listening
   while (1) {
     if (len = msgrcv(msqid, (struct msgbuf *) &data, maxlen, 1, 0) < 0) {
-      printf("Can\'t receive message from queue\n");
+      printf("Can\'t receive message from queue3\n");
       exit(-1);
     }
     if (data.info.operation == 'f') { //finish work 
