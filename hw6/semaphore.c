@@ -3,30 +3,26 @@
 #include <sys/msg.h>
 #include <string.h>
 #include <stdio.h>
+#define QUEUE_SIZE 1024
 
 struct queue {
-  int SIZE = 1024;
-  int l = 0, r = 0;
-  int data [SIZE];
-}
+  int l, r;
+  int data [QUEUE_SIZE];
+};
 
 int queue_size(const struct queue *q) {
-  return *q.r - *q.l;
-}
-
-bool queue_empty(const struct queue *q) {
-  return *q.r - *q.l > 0;
+  return q->r - q->l;
 }
   
 int queue_pop(const struct queue *q) {
-  int ans = *q.data[*q.l];
-  *q.l++;
+  int ans = q->data[q->l];
+  (q->l)++;
   return ans;
 }
   
 void queue_push(const struct queue *q, int val) {
-  *q.data[*q.r] = val;
-  *q.r++;
+  q->data[q->r] = val;
+  (q->r)++;
 }
 
 int main() {
@@ -36,7 +32,8 @@ int main() {
   key_t key;
   int i, len, maxlen;
   int s = 1; //semaphore
-  queue clients;
+  struct queue clients;
+  clients.l = 0; clients.r = 0;
   
   struct mymsgbuf {
     long mtype;
@@ -46,11 +43,11 @@ int main() {
     } info;
   } data, answer;
   
-  struct mymsgbuf mymsgbuf_init(const struct msgbuf *buf, long mtype_, char operation_, int pid_) {   
-    *buf.mtype = mtype_;
-    *buf.operation = operation_;
-    *buf.pid = pid_;
-    return *buf;
+  struct mymsgbuf * mymsgbuf_init(const struct mymsgbuf *buf, long mtype, char operation, int pid) {   
+    buf->mtype = mtype;
+    buf->info.operation = operation;
+    buf->info.pid = pid;
+    return buf;
   }
   //generating IPC key from filename for queue #0
   if ((key = ftok(pathname, 0)) < 0) {
@@ -74,40 +71,8 @@ int main() {
   }
   
   maxlen = 81;
-  //start listening
-  while (1) {
-    if (len = msgrcv(msqid, (struct msgbuf *) &data, maxlen, 1, 0) < 0) {
-      printf("Can\'t receive message from queue\n");
-      exit(-1);
-    }
-    if (data.info.operation == 'f') { //finish work 
-      msgctl(msqid, IPC_RMID, (struct msqid_ds *) NULL); //delete msg queue
-      exit(0);
-    } 
-    else if (data.info.operation == 'p') {
-      if (s == 0) {
-	queue_push(&clients, data.info.pid)
-      }
-      else {
-	s--;
-	send_message(mymsgbuf_init(&answer, data.info.pid, 'p', 0));
-      }
-    }
-    else if (data.info.operation == 'v') {
-      if (s == 0) {
-	s++;
-	if (!queue_empty(&clients)) {
-	  int client = queue_pop(&clients);
-	  send_message(mymsgbuf_init(&answer, client, 'p', 0));
-      }
-    }
-    else {
-      printf("Received wrong message\n");
-      exit(-1);
-    }
-  }
   
-  for (int i = 0; i < CLIENTS; i++) {
+  for (i = 0; i < CLIENTS; i++) {
     int pid = fork();
     if (pid == -1) {
       printf("Can\'t create child process\n");
@@ -127,6 +92,41 @@ int main() {
   }
   
   send_message(mymsgbuf_init(&data, 1, 'f', 0));
+  
+  //start listening
+  while (1) {
+    if (len = msgrcv(msqid, (struct msgbuf *) &data, maxlen, 1, 0) < 0) {
+      printf("Can\'t receive message from queue\n");
+      exit(-1);
+    }
+    if (data.info.operation == 'f') { //finish work 
+      msgctl(msqid, IPC_RMID, (struct msqid_ds *) NULL); //delete msg queue
+      exit(0);
+    } 
+    else if (data.info.operation == 'p') {
+      if (s == 0) {
+	queue_push(&clients, data.info.pid);
+      }
+      else {
+	s--;
+	send_message(mymsgbuf_init(&answer, data.info.pid, 'p', 0));
+      }
+    }
+    else if (data.info.operation == 'v') {
+      if (s == 0) {
+	s++;
+	if (queue_size(&clients) > 0) {
+	  int client = queue_pop(&clients);
+	  send_message(mymsgbuf_init(&answer, client, 'p', 0));
+	}
+      }
+    }
+    else {
+      printf("Received wrong message\n");
+      exit(-1);
+    }
+  }
+  
   return 0;
 }
 	
