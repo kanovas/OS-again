@@ -3,7 +3,31 @@
 #include <sys/msg.h>
 #include <string.h>
 #include <stdio.h>
-#include <queue>
+
+struct queue {
+  int const SIZE = 1024;
+  int l = 0, r = 0;
+  int data [SIZE];
+  
+  int size() {
+    return r - l;
+  }
+  
+  bool empty() {
+    return size() > 0;
+  }
+  
+  int pop() {
+    int ans = data[l];
+    l++;
+    return ans;
+  }
+  
+  void push(int & val) {
+    data[r] = val;
+    r++;
+  }
+}
 
 int main() {
   int const CLIENTS = 5;
@@ -11,8 +35,8 @@ int main() {
   char pathname[] = "semaphore.c";
   key_t key;
   int i, len, maxlen;
-  int s; //semaphore
-  std::queue<int> clients;
+  int s = 1; //semaphore
+  queue clients;
   
   struct mymsgbuf {
     long mtype;
@@ -20,7 +44,13 @@ int main() {
       char operation; //'p', 'v', 'f'
       int pid;
     } info;
-  } mybuf;
+    
+    mymsgbuf(long& mtype_, char& operation_, int& pid_) {
+      mtype = mtype_;
+      operation = operation_;
+      pid = pid_;
+    }
+  } data;
   
   //generating IPC key from filename for queue #0
   if ((key = ftok(pathname, 0)) < 0) {
@@ -34,32 +64,41 @@ int main() {
     exit(-1);
   } 
   
+  void send_message(mymsgbuf & msg) {
+    int len = sizeof(msg);
+    if (msgsnd(msqid, (struct msgbuf *) &msg, len, 0) < 0) {
+      printf("Can\'t send message to queue\n");
+      msgctl(msqid, IPC_RMID, (struct msqid_ds *) NULL);
+      exit(-1);
+    }  
+  }
+  
   maxlen = 81;
   //start listening
   while (1) {
-    if ((len = msgrcv(msqid, (struct msgbuf *) &mybuf, maxlen, 0, 0) < 0) {
+    if ((len = msgrcv(msqid, (struct msgbuf *) &data, maxlen, 1, 0) < 0) {
       printf("Can\'t receive message from queue\n");
       exit(-1);
     }
-    if (mybuf.info.operation == 'f') { //finish work 
+    if (data.info.operation == 'f') { //finish work 
       msgctl(msqid, IPC_RMID, (struct msqid_ds *) NULL); //delete msg queue
       exit(0);
     } 
-    else if (mybuf.info.operation == 'p') {
+    else if (data.info.operation == 'p') {
       if (s == 0) {
-	clients.push(mybuf.info.pid);
+	clients.push(data.info.pid);
       }
       else {
-	//TODO SEND MESSAGE
+	s--;
+	send_message(mymsgbuf(data.info.pid, 'p', 0));
       }
     }
-    else if (mybuf.info.operation == 'v') {
+    else if (data.info.operation == 'v') {
       if (s == 0) {
 	s++;
 	if (!clients.empty()) {
-	  int client = clients.front();
-	  clients.pop();
-	  //TODO SEND MESSAGE
+	  int client = clients.pop();
+	  send_message(mymsgbuf(client, 'p', 0));
       }
     }
     else {
@@ -75,11 +114,18 @@ int main() {
       exit(-1);
     }
     else if (pid == 0) { //child process action
-      proberen(); //TODO
-      verhogen(); //TODO
+      int cur_pid = getpid();
+      //proberen
+      send_message(mymsgbuf(1, 'p', cur_pid));
+      if ((len = msgrcv(msqid, (struct msgbuf *) &data, maxlen, cur_pid, 0) < 0) {
+	  printf("Can\'t receive message from queue\n");
+	  exit(-1);
+      }   
+      //verhogen
+      send_message(mymsgbuf(1, 'v', cur_pid));
     } 
   }
   
-  
+  send_message(mymsgbuf(1, 'f', 0););
 }
 	
