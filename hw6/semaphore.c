@@ -99,7 +99,8 @@ int main() {
   
   //start listening
   while (1) {
-    if (len = msgrcv(msqid, &data, maxlen, 1, IPC_NOWAIT) < 0 && errno != EAGAIN) {    //not blocking msgrcv
+    if (len = msgrcv(msqid, &data, maxlen, 1, IPC_NOWAIT) < 0) {    //not blocking msgrcv
+      if (errno == EAGAIN) continue;
       perror("Can\'t receive message from queue3\n");
       exit(-1);
     }
