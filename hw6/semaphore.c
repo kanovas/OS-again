@@ -99,15 +99,16 @@ int main() {
   
   //start listening
   while (1) {
+    if (waitpid(-1, NULL, WNOHANG) < 0) {    //children are dead, finish work
+      msgctl(msqid, IPC_RMID, NULL);        //delete msg queue
+      exit(0);
+    }
+    
     if (len = msgrcv(msqid, &data, maxlen, 1, IPC_NOWAIT) < 0) {    //not blocking msgrcv
       if (errno == EAGAIN) continue;
       perror("Can\'t receive message from queue3\n");
       exit(-1);
     }
-    if (waitpid(-1, NULL, WNOHANG) < 0) {    //children are dead, finish work
-      msgctl(msqid, IPC_RMID, NULL);        //delete msg queue
-      exit(0);
-    } 
     
     if (data.info.operation == 'p') {
       if (s == 0) {
