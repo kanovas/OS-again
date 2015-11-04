@@ -62,7 +62,7 @@ int main() {
   } 
   
   void send_message(struct mymsgbuf *msg) {
-    int len = sizeof(msg);
+    int len = sizeof(*msg);
     if (msgsnd(msqid, (struct msgbuf *) msg, len, 0) < 0) {
       printf("Can\'t send message to queue1\n");
       msgctl(msqid, IPC_RMID, (struct msqid_ds *) NULL);
