@@ -29,7 +29,7 @@ void queue_push(struct queue *q, int val) {
 }
 
 int main() {
-  int const CLIENTS = 5;
+  int const CLIENTS = 10;
   int msqid;
   char pathname[] = "semaphore.c";
   key_t key;
@@ -105,7 +105,7 @@ int main() {
     }
     
     if (len = msgrcv(msqid, &data, maxlen, 1, IPC_NOWAIT) < 0) {    //not blocking msgrcv
-      if (errno == EAGAIN) continue;
+      if (errno == ENOMSG) continue;
       perror("Can\'t receive message from queue3\n");
       exit(-1);
     }
@@ -124,6 +124,7 @@ int main() {
 	s++;
 	if (queue_size(&clients) > 0) {
 	  int client = queue_pop(&clients);
+	  s--;
 	  send_message(mymsgbuf_init(&answer, client, 'p', 0));
 	}
       }
