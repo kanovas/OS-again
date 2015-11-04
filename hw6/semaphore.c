@@ -89,8 +89,9 @@ int main() {
       //verhogen
       send_message(mymsgbuf_init(&data, 1, 'v', cur_pid));
       printf("v operation made");
+      exit(0);
     } 
-  }
+  } 
   
   send_message(mymsgbuf_init(&data, 1, 'f', 0));
   
@@ -126,7 +127,7 @@ int main() {
       perror("Received wrong message\n");
       exit(-1);
     }
-  }
+  } 
   
   return 0;
 }
