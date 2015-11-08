@@ -82,7 +82,7 @@ void sem_d(struct sembuf * mybuf, int semid, int num) {
   mybuf->sem_flg = 0;
   mybuf->sem_num = num;
   if(semop(semid, mybuf, 1) < 0){
-    printf("Can\'t wait for condition\n");
+    perror("Can\'t wait for condition\n");
     exit(-1);
   }
 }
@@ -92,7 +92,7 @@ void sem_a(struct sembuf * mybuf, int semid, int num) {
   mybuf->sem_flg = 0;
   mybuf->sem_num = num;
   if(semop(semid, mybuf, 1) < 0){
-    printf("Can\'t wait for condition\n");
+    perror("Can\'t wait for condition\n");
     exit(-1);
   }
 }
@@ -108,11 +108,11 @@ int main() {
   //semaphore array
   struct sembuf mybuf; 
   if((key = ftok(pathname,0)) < 0){
-    printf("Can\'t generate key\n");
+    perror("Can\'t generate key\n");
     exit(-1);
   }
   if((semid = semget(key, 2, 0666 | IPC_CREAT)) < 0){
-    printf("Can\'t get semid\n");
+    perror("Can\'t get semid\n");
     exit(-1);
   }
   
@@ -123,7 +123,6 @@ int main() {
   }
   else if (pid == 0) {
     while (1) {
-      printf("hi");
       sem_d(&mybuf, semid, 0); //waiting for matrices
       input(m1, m2);
       sem_a(&mybuf, semid, 0); //opening matrices
@@ -137,7 +136,6 @@ int main() {
     }
     else if (pid == 0) {
       while (1) {
-	printf("hii");
 	sem_d(&mybuf, semid, 1); //waiting for result
         sem_d(&mybuf, semid, 0); //waiting for matrices
         sum(m1, m2, result);
@@ -147,7 +145,6 @@ int main() {
     }
     else {
       while (1) {
-	printf("hiii");
 	sem_d(&mybuf, semid, 1); //waiting for result
 	output(result);
 	sem_a(&mybuf, semid, 1); //opening result
