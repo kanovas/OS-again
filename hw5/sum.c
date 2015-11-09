@@ -5,7 +5,10 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/sem.h>
+#include <semaphore.h>
 #include <errno.h>
+#include <time.h>
+#include <string.h>
 
 #define n 3
 #define m 3
@@ -15,12 +18,12 @@ void input(int* m1, int* m2) {
   int i, j;
   for (i = 0; i < n; i++)
     for (j = 0; j < m; j++)
-      scanf("%d", &m1[i*n + m]);
+      scanf("%d", &m1[i*m + j]);
     
   printf("Input matrix #2\n");
   for (i = 0; i < n; i++)
     for (j = 0; j < m; j++)
-      scanf("%d", &m2[i*n + m]);
+      scanf("%d", &m2[i*m + j]);
   return;
 }
 
@@ -28,7 +31,7 @@ void sum(int* m1, int* m2, int* res) {
   int i, j;
   for (i = 0; i < n; i++) 
     for (j = 0; j < m; j++) 
-      res[i*n + m] = m1[i*n + m] + m2[i*n + m];
+      res[i*m + j] = m1[i*m + j] + m2[i*m + j];
   return;
 }
 
@@ -37,26 +40,27 @@ void output(int* matrix){
   printf("Sum result is: \n");
   for (i = 0; i < n; i++) {
     for (j = 0; j < m; j++)
-      printf("%d ", matrix[i*n + m]);
+      printf("%d ", matrix[i*m + j]);
     printf("\n");
   }
+  printf("\n");
   return;
 }
 
-int* reserve_memory(int key, char pathname[], int num) {
+int* reserve_memory(int key, char pathname[], int size, int num) {
   int shmid;
   int * arr;
   if ((key = ftok(pathname, num)) < 0){
     perror("Can't generate key\n");
     exit(-1);
   }
-  if ((shmid = shmget(key, n*m*sizeof(int), 0666|IPC_CREAT|IPC_EXCL)) < 0) {
+  if ((shmid = shmget(key, size*sizeof(int), 0666|IPC_CREAT|IPC_EXCL)) < 0) {
     if (errno != EEXIST){
       perror("Can't create shared memory\n");
       exit(-1);
     } 
     else {   
-      if ((shmid = shmget(key, n*m*sizeof(int), 0)) < 0){
+      if ((shmid = shmget(key, size*sizeof(int), 0)) < 0){
 	perror("Can't find shared memory\n");
 	exit(-1);
       }
@@ -98,13 +102,14 @@ void sem_a(struct sembuf * mybuf, int semid, int num) {
 }
 
 int main() {
-  
   char pathname[] = "sum.c";
-  int key1, key2, key3, key, semid;
+  int key1, key2, key3, key4, key5, key, semid;
   //shared memory
-  int * m1 = reserve_memory(key1, pathname, 0);
-  int * m2 = reserve_memory(key2, pathname, 1);
-  int * result = reserve_memory(key3, pathname, 2);
+  int * m1 = reserve_memory(key1, pathname, n*m, 0);
+  int * m2 = reserve_memory(key2, pathname, n*m, 1);
+  int * result = reserve_memory(key3, pathname, n*m, 2);
+  int * new_matrices = reserve_memory(key4, pathname, 1, 3);
+  int * new_result = reserve_memory(key5, pathname, 1, 4);
   //semaphore array
   struct sembuf mybuf; 
   if((key = ftok(pathname,0)) < 0){
@@ -115,6 +120,12 @@ int main() {
     perror("Can\'t get semid\n");
     exit(-1);
   }
+
+  sem_t mutex1, mutex2;
+  sem_init(&mutex1, 0, 1);
+  sem_init(&mutex2, 0, 2);
+  *new_matrices = 0;
+  *new_result = 0;
   
   int pid = fork();
   if (pid < 0) {
@@ -123,9 +134,10 @@ int main() {
   }
   else if (pid == 0) {
     while (1) {
-      sem_d(&mybuf, semid, 0); //waiting for matrices
+      sem_wait(&mutex1); //waiting for matrices
       input(m1, m2);
-      sem_a(&mybuf, semid, 0); //opening matrices
+      *new_matrices = 1;
+      sem_post(&mutex1); //opening matrices
     }
   }
   else {
@@ -136,23 +148,33 @@ int main() {
     }
     else if (pid == 0) {
       while (1) {
-	sem_d(&mybuf, semid, 1); //waiting for result
-        sem_d(&mybuf, semid, 0); //waiting for matrices
-        sum(m1, m2, result);
-	sem_a(&mybuf, semid, 0); //opening matrices
-	sem_a(&mybuf, semid, 1); //opening result
+	if (*new_matrices) {
+	  sem_wait(&mutex2); //waiting for result
+          sem_wait(&mutex1); //waiting for matrices
+          sum(m1, m2, result);
+	  *new_matrices = 0;
+	  *new_result = 1;
+	  sem_post(&mutex1); //opening matrices
+	  sem_post(&mutex2); //opening result
+	}
       }
     }
     else {
       while (1) {
-	sem_d(&mybuf, semid, 1); //waiting for result
-	output(result);
-	sem_a(&mybuf, semid, 1); //opening result
+	if (*new_result) {
+	  sem_wait(&mutex2); //waiting for result
+	  output(result);
+	  *new_result = 0;
+	  sem_post(&mutex2); //opening result
+	}
       }
     }
   }
   
+  sem_destroy(&mutex1);
+  sem_destroy(&mutex2);
   free_memory(m1);
   free_memory(m2);
   free_memory(result);
+  return 0;
 }
