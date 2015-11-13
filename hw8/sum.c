@@ -16,8 +16,8 @@ sem_t mutex1, mutex2;
 void *input() {
  
   while(1) {
+    sem_wait(&mutex1); //waiting for matrices
     if (!new_matrices && !new_result) {
-      sem_wait(&mutex1); //waiting for matrices
       printf("Input matrix #1\n");
       for (i = 0; i < n; i++)
         for (j = 0; j < m; j++)
@@ -28,33 +28,33 @@ void *input() {
         for (j = 0; j < m; j++)
           scanf("%d", &m2[i*m + j]);
       new_matrices = 1;
-      sem_post(&mutex1); //opening matrices
     }
+    sem_post(&mutex1); //opening matrices
   }
 }
 
 void *sum() {
   
   while(1) {
+    sem_wait(&mutex2); //waiting for result
+    sem_wait(&mutex1); //waiting for matrices
     if (new_matrices && !new_result) {
-      sem_wait(&mutex2); //waiting for result
-      sem_wait(&mutex1); //waiting for matrices
       for (i = 0; i < n; i++) 
         for (j = 0; j < m; j++) 
           result[i*m + j] = m1[i*m + j] + m2[i*m + j];
       new_matrices = 0;
       new_result = 1;
-      sem_post(&mutex1); //opening matrices
-      sem_post(&mutex2); //opening result
     }    
+    sem_post(&mutex1); //opening matrices
+    sem_post(&mutex2); //opening result
   }
 }
 
 void *output(){
   
   while(1) {
+    sem_wait(&mutex2); //waiting for result
     if (new_result) {
-      sem_wait(&mutex2); //waiting for result
       printf("Sum result is: \n");
       for (i = 0; i < n; i++) {
         for (j = 0; j < m; j++)
@@ -62,8 +62,8 @@ void *output(){
         printf("\n");
       }
       new_result = 0;
-      sem_post(&mutex2); //opening result
     }
+    sem_post(&mutex2); //opening result
   }
 }
 
