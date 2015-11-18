@@ -47,8 +47,8 @@ void output(int* matrix){
   return;
 }
 
-int* reserve_memory(int key, char pathname[], int size, int num) {
-  int shmid;
+int* reserve_memory(char pathname[], int size, int num) {
+  int shmid, key;
   int * arr;
   if ((key = ftok(pathname, num)) < 0){
     perror("Can't generate key\n");
@@ -103,13 +103,13 @@ void sem_a(struct sembuf * mybuf, int semid, int num) {
 
 int main() {
   char pathname[] = "sum.c";
-  int key1, key2, key3, key4, key5, key, semid;
+  int key, semid;
   //shared memory
-  int * m1 = reserve_memory(key1, pathname, n*m, 0);
-  int * m2 = reserve_memory(key2, pathname, n*m, 1);
-  int * result = reserve_memory(key3, pathname, n*m, 2);
-  int * new_matrices = reserve_memory(key4, pathname, 1, 3);
-  int * new_result = reserve_memory(key5, pathname, 1, 4);
+  int * m1 = reserve_memory(pathname, n*m, 0);
+  int * m2 = reserve_memory(pathname, n*m, 1);
+  int * result = reserve_memory(pathname, n*m, 2);
+  int * new_matrices = reserve_memory(pathname, 1, 3);
+  int * new_result = reserve_memory(pathname, 1, 4);
   //semaphore array
   struct sembuf mybuf; 
   if((key = ftok(pathname,0)) < 0){
@@ -121,9 +121,6 @@ int main() {
     exit(-1);
   }
 
-  sem_t mutex1, mutex2;
-  sem_init(&mutex1, 0, 1);
-  sem_init(&mutex2, 0, 2);
   *new_matrices = 0;
   *new_result = 0;
   
@@ -134,10 +131,10 @@ int main() {
   }
   else if (pid == 0) {
     while (1) {
-      sem_wait(&mutex1); //waiting for matrices
+      sem_d(&mybuf, semid, 0); //waiting for matrices
       input(m1, m2);
       *new_matrices = 1;
-      sem_post(&mutex1); //opening matrices
+      sem_a(&mybuf, semid, 0); //opening matrices
     }
   }
   else {
@@ -149,30 +146,28 @@ int main() {
     else if (pid == 0) {
       while (1) {
 	if (*new_matrices) {
-	  sem_wait(&mutex2); //waiting for result
-          sem_wait(&mutex1); //waiting for matrices
-          sum(m1, m2, result);
+	  sem_d(&mybuf, semid, 1); //waiting for result
+	  sem_d(&mybuf, semid, 0); //waiting for matrices
+	  sum(m1, m2, result);
 	  *new_matrices = 0;
 	  *new_result = 1;
-	  sem_post(&mutex1); //opening matrices
-	  sem_post(&mutex2); //opening result
+	  sem_a(&mybuf, semid, 0); //opening matrices
+	  sem_a(&mybuf, semid, 1); //opening result
 	}
       }
     }
     else {
       while (1) {
 	if (*new_result) {
-	  sem_wait(&mutex2); //waiting for result
+	  sem_d(&mybuf, semid, 1); //waiting for result
 	  output(result);
 	  *new_result = 0;
-	  sem_post(&mutex2); //opening result
+	  sem_a(&mybuf, semid, 1); //opening result
 	}
       }
     }
   }
   
-  sem_destroy(&mutex1);
-  sem_destroy(&mutex2);
   free_memory(m1);
   free_memory(m2);
   free_memory(result);
