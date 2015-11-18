@@ -121,8 +121,8 @@ int main() {
     exit(-1);
   }
 
-  sem_t * mutex1 = (sem_t*)reserve_memory(pathname, 1, 5);
-  sem_t * mutex2 = (sem_t*)reserve_memory(pathname, 1, 6);
+  sem_t * mutex1 = (sem_t*) reserve_memory(pathname, 1, 5);
+  sem_t * mutex2 = (sem_t*) reserve_memory(pathname, 1, 6);
   sem_init(mutex1, 1, 0); //create shared semaphore
   sem_init(mutex2, 1, 0); //create shared semaphore
   *new_matrices = 0;
@@ -135,7 +135,7 @@ int main() {
   }
   else if (pid == 0) {
     while (1) {
-      sem_wait(mutex1); //waiting for matrices
+      sem_trywait(mutex1); //waiting for matrices
       input(m1, m2);
       *new_matrices = 1;
       sem_post(mutex1); //opening matrices
@@ -150,8 +150,8 @@ int main() {
     else if (pid == 0) {
       while (1) {
 	if (*new_matrices) {
-	  sem_wait(mutex2); //waiting for result
-          sem_wait(mutex1); //waiting for matrices
+	  sem_trywait(mutex2); //waiting for result
+          sem_trywait(mutex1); //waiting for matrices
           sum(m1, m2, result);
 	  *new_matrices = 0;
 	  *new_result = 1;
@@ -163,7 +163,7 @@ int main() {
     else {
       while (1) {
 	if (*new_result) {
-	  sem_wait(mutex2); //waiting for result
+	  sem_trywait(mutex2); //waiting for result
 	  output(result);
 	  *new_result = 0;
 	  sem_post(mutex2); //opening result
