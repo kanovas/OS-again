@@ -18,12 +18,14 @@ void input(int* m1, int* m2) {
   int i, j;
   for (i = 0; i < n; i++)
     for (j = 0; j < m; j++)
-      scanf("%d", &m1[i*m + j]);
+      //scanf("%d", &m1[i*m + j]);
+      m1[i*m + j] = 1;
     
   printf("Input matrix #2\n");
   for (i = 0; i < n; i++)
     for (j = 0; j < m; j++)
-      scanf("%d", &m2[i*m + j]);
+      //scanf("%d", &m2[i*m + j]);
+      m2[i*m + j] = 1;
   return;
 }
 
@@ -136,8 +138,10 @@ int main() {
   else if (pid == 0) {
     while (1) {
       sem_trywait(mutex1); //waiting for matrices
-      input(m1, m2);
-      *new_matrices = 1;
+      if (!*new_result && !*new_matrices) {
+	input(m1, m2);
+	*new_matrices = 1;
+      }
       sem_post(mutex1); //opening matrices
     }
   }
@@ -149,25 +153,25 @@ int main() {
     }
     else if (pid == 0) {
       while (1) {
-	if (*new_matrices) {
-	  sem_trywait(mutex2); //waiting for result
-          sem_trywait(mutex1); //waiting for matrices
+	sem_trywait(mutex2); //waiting for result
+        sem_trywait(mutex1); //waiting for matrices
+	if (*new_matrices && !*new_result) {
           sum(m1, m2, result);
 	  *new_matrices = 0;
 	  *new_result = 1;
-	  sem_post(mutex1); //opening matrices
-	  sem_post(mutex2); //opening result
 	}
+	sem_post(mutex1); //opening matrices
+	sem_post(mutex2); //opening result
       }
     }
     else {
       while (1) {
-	if (*new_result) {
-	  sem_trywait(mutex2); //waiting for result
+	sem_trywait(mutex2); //waiting for result
+	if (*new_result && !*new_matrices) {
 	  output(result);
 	  *new_result = 0;
-	  sem_post(mutex2); //opening result
 	}
+	sem_post(mutex2); //opening result
       }
     }
   }
