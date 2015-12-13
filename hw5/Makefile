@@ -1,11 +1,12 @@
 CC = gcc
 SRC = sum.c
-C_FLAGS = -fPIC -pthread -L../lib/ -I../lib/ -Wl,-R../lib/
+C_FLAGS = -pthread
 
-all: sum
+all: clean sum
 
 sum:
-	$(CC) -o sum $(C_FLAGS) $(SRC) -lrt
+	$(CC) -o sum $(C_FLAGS) $(SRC)
 
+.PHONY : clean
 clean:
-	rm -f sum
+	rm -rf sum
