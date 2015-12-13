@@ -83,26 +83,6 @@ void free_memory(int * arr) {
   return;
 }
 
-void sem_d(struct sembuf * mybuf, int semid, int num) {
-  mybuf->sem_op = -1;
-  mybuf->sem_flg = 0;
-  mybuf->sem_num = num;
-  if(semop(semid, mybuf, 1) < 0){
-    perror("Can\'t wait for condition\n");
-    exit(-1);
-  }
-}
-
-void sem_a(struct sembuf * mybuf, int semid, int num) {
-  mybuf->sem_op = 1;
-  mybuf->sem_flg = 0;
-  mybuf->sem_num = num;
-  if(semop(semid, mybuf, 1) < 0){
-    perror("Can\'t wait for condition\n");
-    exit(-1);
-  }
-}
-
 int main() {
   char pathname[] = "sum.c";
   int key, semid;
@@ -112,21 +92,12 @@ int main() {
   int * result = reserve_memory(pathname, n*m, 2);
   int * new_matrices = reserve_memory(pathname, 1, 3);
   int * new_result = reserve_memory(pathname, 1, 4);
-  //semaphore array
-  struct sembuf mybuf; 
-  if((key = ftok(pathname,0)) < 0){
-    perror("Can\'t generate key\n");
-    exit(-1);
-  }
-  if((semid = semget(key, 2, 0666 | IPC_CREAT)) < 0){
-    perror("Can\'t get semid\n");
-    exit(-1);
-  }
-
+  
+  //mutexes
   sem_t * mutex1 = (sem_t*) reserve_memory(pathname, 1, 5);
   sem_t * mutex2 = (sem_t*) reserve_memory(pathname, 1, 6);
-  sem_init(mutex1, 1, 0); //create shared semaphore
-  sem_init(mutex2, 1, 0); //create shared semaphore
+  sem_init(mutex1, 1, 1); //create shared semaphore
+  sem_init(mutex2, 1, 1); //create shared semaphore
   *new_matrices = 0;
   *new_result = 0;
   
@@ -137,7 +108,7 @@ int main() {
   }
   else if (pid == 0) {
     while (1) {
-      sem_trywait(mutex1); //waiting for matrices
+      sem_wait(mutex1); //waiting for matrices  //!blocking! while < 1
       if (!*new_result && !*new_matrices) {
 	input(m1, m2);
 	*new_matrices = 1;
@@ -153,8 +124,8 @@ int main() {
     }
     else if (pid == 0) {
       while (1) {
-	sem_trywait(mutex2); //waiting for result
-        sem_trywait(mutex1); //waiting for matrices
+	sem_wait(mutex2); //waiting for result
+        sem_wait(mutex1); //waiting for matrices
 	if (*new_matrices && !*new_result) {
           sum(m1, m2, result);
 	  *new_matrices = 0;
@@ -166,7 +137,7 @@ int main() {
     }
     else {
       while (1) {
-	sem_trywait(mutex2); //waiting for result
+	sem_wait(mutex2); //waiting for result
 	if (*new_result && !*new_matrices) {
 	  output(result);
 	  *new_result = 0;
